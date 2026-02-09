@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics Test - Heavy Gravity</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #e0e0e0;
+            font-family: monospace;
+        }
+
+        .img-container {
+            position: absolute;
+            cursor: crosshair;
+            /* Debug border to see the click area */
+            border: 1px dashed rgba(0,0,0,0.2); 
+            width: 100px;
+            height: 100px;
+            transform: translate(-50%, -50%); /* Center on coordinate */
+        }
+
+        .cluster-img {
+            position: absolute;
+            width: 50px; 
+            height: 50px;
+            background-color: #ff4444; /* Bright RED for visibility */
+            border: 2px solid #990000;
+            user-select: none;
+            /* CRITICAL: Disables CSS transitions so JS Physics can work */
+            transition: none !important; 
+            will-change: transform;
+        }
+    </style>
+</head>
+<body>
+
+    <div style="position: absolute; top: 20px; left: 20px; pointer-events: none; color: #555;">
+        <h3>Physics Debug Mode</h3>
+        <p>1. Hover over the red cluster.</p>
+        <p>2. Items should fall DOWN immediately.</p>
+    </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const body = document.body;
+    let zIndexCounter = 1000; 
+
+    // --- PHYSICS SETTINGS ---
+    const config = {
+        gravity: 1.2,        // Strong downward pull
+        horizontalForce: 10, // Slight sideways push
+        drag: 0.99,          // Air resistance
+        rotationSpeed: 15
+    };
+
+    function createCluster() {
+        const cluster = document.createElement('div');
+        cluster.classList.add('img-container');
+        
+        // Spawn in the top half of the screen so they have room to fall
+        const x = Math.random() * (window.innerWidth - 200) + 100;
+        const y = Math.random() * (window.innerHeight / 2) + 100;
+        
+        cluster.style.left = `${x}px`;
+        cluster.style.top = `${y}px`;
+        cluster.style.zIndex = zIndexCounter++; 
+
+        // Create 3-5 Images
+        const numImages = Math.floor(Math.random() * 3) + 3;
+
+        for (let i = 0; i < numImages; i++) {
+            const img = document.createElement('div'); // Using divs for testing (no images needed)
+            img.classList.add('cluster-img');
+
+            // Random Size
+            const scale = Math.random() * 1.5 + 0.5;
+            img.style.width = `${40 * scale}px`;
+            img.style.height = `${40 * scale}px`;
+
+            // Center in container
+            img.style.left = '50%';
+            img.style.top = '50%';
+            img.style.transform = 'translate(-50%, -50%)';
+
+            cluster.appendChild(img);
+        }
+
+        cluster.addEventListener('mouseenter', () => {
+            if (!cluster.dataset.exploding) {
+                console.log("BOOM! Gravity initiated.");
+                cluster.dataset.exploding = 'true';
+                
+                // 1. Start Physics on current cluster
+                applyGravity(cluster);
+                
+                // 2. Spawn new cluster immediately
+                createCluster(); 
+            }
+        });
+
+        body.appendChild(cluster);
+    }
+
+    function applyGravity(cluster) {
+        // Stop user from interacting with falling pieces
+        cluster.style.pointerEvents = 'none';
+        
+        const children = Array.from(cluster.children);
+        let activeParticles = children.length;
+        
+        // Get absolute start position
+        const rect = cluster.getBoundingClientRect();
+        const startY = rect.top;
+
+        children.forEach((img) => {
+            // -- SETUP PHYSICS --
+            
+            // Random horizontal velocity (Left or Right)
+            let velocityX = (Math.random() - 0.5) * config.horizontalForce * 2;
+            
+            // Vertical velocity starts at 0 (or slightly down). NEVER UP.
+            let velocityY = Math.random() * 2; 
+
+            let posX = 0;
+            let posY = 0;
+            let rotation = 0;
+            let rotSpeed = (Math.random() - 0.5) * config.rotationSpeed;
+
+            // -- ANIMATION LOOP --
+            function frame() {
+                // 1. Add Gravity to Vertical Velocity
+                velocityY += config.gravity; 
+                
+                // 2. Add Drag to Horizontal Velocity
+                velocityX *= config.drag;
+
+                // 3. Move Object
+                posX += velocityX;
+                posY += velocityY;
+                rotation += rotSpeed;
+
+                img.style.transform = `translate(${posX}px, ${posY}px) rotate(${rotation}deg)`;
+
+                // 4. Check if off screen
+                const currentAbsY = startY + posY;
+
+                if (currentAbsY < window.innerHeight + 100) {
+                    // Still on screen, keep falling
+                    requestAnimationFrame(frame);
+                } else {
+                    // Fell off bottom
+                    img.remove();
+                    activeParticles--;
+                    if (activeParticles === 0) {
+                        cluster.remove();
+                        console.log("Cluster cleanup complete.");
+                    }
+                }
+            }
+            
+            // Start the loop
+            requestAnimationFrame(frame);
+        });
+    }
+
+    // Start
+    createCluster();
+});
+</script>
+</body>
+</html>
